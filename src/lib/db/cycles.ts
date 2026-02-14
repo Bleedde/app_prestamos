@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './dexie';
-import { pushCycleToSupabase } from './sync';
+import { pushCycleToSupabase, getCurrentUserId } from './sync';
 import { getCurrentDateISO } from '@/lib/utils/format';
 import type { Cycle, CycleStatus } from '@/types';
 
@@ -15,9 +15,11 @@ interface CreateCycleInput {
  */
 export async function createCycle(input: CreateCycleInput): Promise<Cycle> {
   const now = getCurrentDateISO();
+  const userId = await getCurrentUserId();
 
   const cycle: Cycle = {
     id: uuidv4(),
+    user_id: userId,
     loan_id: input.loan_id,
     cycle_number: input.cycle_number,
     start_date: input.start_date,

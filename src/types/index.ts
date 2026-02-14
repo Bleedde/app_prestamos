@@ -6,6 +6,7 @@ export type PaymentType = 'complete' | 'interest_only' | 'partial';
 
 export interface Loan {
   id: string;
+  user_id: string;
   client_name: string;
   principal: number; // Monto principal del préstamo
   photo_url?: string; // Foto del cliente (opcional)
@@ -18,6 +19,7 @@ export interface Loan {
 
 export interface Cycle {
   id: string;
+  user_id: string;
   loan_id: string;
   cycle_number: number;
   start_date: string; // ISO 8601
@@ -28,6 +30,7 @@ export interface Cycle {
 
 export interface Payment {
   id: string;
+  user_id: string;
   loan_id: string;
   cycle_id: string;
   amount: number;

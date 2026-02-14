@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './dexie';
 import { createCycle } from './cycles';
-import { pushLoanToSupabase, deleteLoanFromSupabase } from './sync';
+import { pushLoanToSupabase, deleteLoanFromSupabase, getCurrentUserId } from './sync';
 import { enrichLoanWithCalculations } from '@/lib/utils/interest';
 import { getCurrentDateISO } from '@/lib/utils/format';
 import type { Loan, LoanWithCalculations, CreateLoanInput, LoanStatus } from '@/types';
@@ -12,9 +12,11 @@ import type { Loan, LoanWithCalculations, CreateLoanInput, LoanStatus } from '@/
 export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   const now = getCurrentDateISO();
   const startDate = input.start_date || now;
+  const userId = await getCurrentUserId();
 
   const loan: Loan = {
     id: uuidv4(),
+    user_id: userId,
     client_name: input.client_name.trim(),
     principal: input.principal,
     photo_url: input.photo_url,
@@ -191,8 +193,8 @@ export async function deleteLoan(id: string): Promise<void> {
     await db.loans.delete(id);
   });
 
-  // Sync con Supabase (cascade delete en BD)
-  deleteLoanFromSupabase(id);
+  // Sync con Supabase
+  await deleteLoanFromSupabase(id);
 }
 
 /**

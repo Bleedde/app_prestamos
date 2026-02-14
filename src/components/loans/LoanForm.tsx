@@ -2,23 +2,29 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { CalendarIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { createLoan } from '@/lib/db/loans';
 import { formatCOP, parseAmount } from '@/lib/utils/format';
-import { calculateTotalOwed } from '@/lib/utils/interest';
 
 export function LoanForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // Estado del formulario
   const [clientName, setClientName] = useState('');
   const [principalStr, setPrincipalStr] = useState('');
+  const [startDate, setStartDate] = useState<Date>(new Date());
 
   // Calcular monto parseado
   const principal = parseAmount(principalStr);
@@ -48,6 +54,7 @@ export function LoanForm() {
       const loan = await createLoan({
         client_name: clientName.trim(),
         principal,
+        start_date: startDate.toISOString(),
       });
 
       // Redirigir al detalle del préstamo
@@ -74,6 +81,42 @@ export function LoanForm() {
           disabled={isLoading}
           autoFocus
         />
+      </div>
+
+      {/* Fecha del préstamo */}
+      <div className="space-y-2">
+        <Label>Fecha del préstamo</Label>
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              type="button"
+              disabled={isLoading}
+              className={cn(
+                'w-full justify-start text-left font-normal',
+                !startDate && 'text-muted-foreground'
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {format(startDate, "d 'de' MMMM, yyyy", { locale: es })}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={startDate}
+              onSelect={(date) => {
+                if (date) {
+                  setStartDate(date);
+                  setCalendarOpen(false);
+                }
+              }}
+              disabled={(date) => date > new Date()}
+              defaultMonth={startDate}
+              locale={es}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Monto del préstamo */}

@@ -1,13 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createBrowserSupabaseClient();
 
 // Tipos para las tablas de Supabase
 export interface SupabaseLoan {
   id: string;
+  user_id: string;
   client_name: string;
   principal: number;
   photo_url: string | null;
@@ -20,6 +18,7 @@ export interface SupabaseLoan {
 
 export interface SupabaseCycle {
   id: string;
+  user_id: string;
   loan_id: string;
   cycle_number: number;
   start_date: string;
@@ -30,6 +29,7 @@ export interface SupabaseCycle {
 
 export interface SupabasePayment {
   id: string;
+  user_id: string;
   loan_id: string;
   cycle_id: string;
   amount: number;

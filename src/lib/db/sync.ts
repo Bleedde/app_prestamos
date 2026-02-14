@@ -10,12 +10,21 @@ import type { Loan, Cycle, Payment } from '@/types';
  * - Al cargar la app -> pull de Supabase y merge con local
  */
 
+// ============== AUTH HELPER ==============
+
+export async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No authenticated user');
+  return user.id;
+}
+
 // ============== PUSH: Local -> Supabase ==============
 
 export async function pushLoanToSupabase(loan: Loan): Promise<void> {
   try {
     const { error } = await supabase.from('loans').upsert({
       id: loan.id,
+      user_id: loan.user_id,
       client_name: loan.client_name,
       principal: loan.principal,
       photo_url: loan.photo_url || null,
@@ -35,6 +44,7 @@ export async function pushCycleToSupabase(cycle: Cycle): Promise<void> {
   try {
     const { error } = await supabase.from('cycles').upsert({
       id: cycle.id,
+      user_id: cycle.user_id,
       loan_id: cycle.loan_id,
       cycle_number: cycle.cycle_number,
       start_date: cycle.start_date,
@@ -52,6 +62,7 @@ export async function pushPaymentToSupabase(payment: Payment): Promise<void> {
   try {
     const { error } = await supabase.from('payments').upsert({
       id: payment.id,
+      user_id: payment.user_id,
       loan_id: payment.loan_id,
       cycle_id: payment.cycle_id,
       amount: payment.amount,
@@ -69,6 +80,20 @@ export async function pushPaymentToSupabase(payment: Payment): Promise<void> {
 
 export async function deleteLoanFromSupabase(loanId: string): Promise<void> {
   try {
+    // Eliminar payments y cycles primero (en caso de que no haya CASCADE en la BD)
+    const { error: paymentsError } = await supabase
+      .from('payments')
+      .delete()
+      .eq('loan_id', loanId);
+    if (paymentsError) console.error('Error deleting payments from Supabase:', paymentsError);
+
+    const { error: cyclesError } = await supabase
+      .from('cycles')
+      .delete()
+      .eq('loan_id', loanId);
+    if (cyclesError) console.error('Error deleting cycles from Supabase:', cyclesError);
+
+    // Finalmente eliminar el préstamo
     const { error } = await supabase.from('loans').delete().eq('id', loanId);
     if (error) console.error('Error deleting loan from Supabase:', error);
   } catch (err) {
@@ -80,9 +105,11 @@ export async function deleteLoanFromSupabase(loanId: string): Promise<void> {
 
 export async function pullLoansFromSupabase(): Promise<Loan[]> {
   try {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from('loans')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -92,6 +119,7 @@ export async function pullLoansFromSupabase(): Promise<Loan[]> {
 
     return (data || []).map((loan) => ({
       id: loan.id,
+      user_id: loan.user_id,
       client_name: loan.client_name,
       principal: Number(loan.principal),
       photo_url: loan.photo_url || undefined,
@@ -109,9 +137,11 @@ export async function pullLoansFromSupabase(): Promise<Loan[]> {
 
 export async function pullCyclesFromSupabase(): Promise<Cycle[]> {
   try {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from('cycles')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -121,6 +151,7 @@ export async function pullCyclesFromSupabase(): Promise<Cycle[]> {
 
     return (data || []).map((cycle) => ({
       id: cycle.id,
+      user_id: cycle.user_id,
       loan_id: cycle.loan_id,
       cycle_number: cycle.cycle_number,
       start_date: cycle.start_date,
@@ -136,9 +167,11 @@ export async function pullCyclesFromSupabase(): Promise<Cycle[]> {
 
 export async function pullPaymentsFromSupabase(): Promise<Payment[]> {
   try {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from('payments')
       .select('*')
+      .eq('user_id', userId)
       .order('payment_date', { ascending: false });
 
     if (error) {
@@ -148,6 +181,7 @@ export async function pullPaymentsFromSupabase(): Promise<Payment[]> {
 
     return (data || []).map((payment) => ({
       id: payment.id,
+      user_id: payment.user_id,
       loan_id: payment.loan_id,
       cycle_id: payment.cycle_id,
       amount: Number(payment.amount),
@@ -222,12 +256,12 @@ export async function syncAll(): Promise<{ success: boolean; message: string }> 
 
 // ============== SUSCRIPCIÓN EN TIEMPO REAL ==============
 
-export function subscribeToChanges(onUpdate: () => void) {
+export function subscribeToChanges(onUpdate: () => void, userId: string) {
   const channel = supabase
     .channel('db-changes')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'loans' },
+      { event: '*', schema: 'public', table: 'loans', filter: `user_id=eq.${userId}` },
       async () => {
         await syncAll();
         onUpdate();
@@ -235,7 +269,7 @@ export function subscribeToChanges(onUpdate: () => void) {
     )
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'cycles' },
+      { event: '*', schema: 'public', table: 'cycles', filter: `user_id=eq.${userId}` },
       async () => {
         await syncAll();
         onUpdate();
@@ -243,7 +277,7 @@ export function subscribeToChanges(onUpdate: () => void) {
     )
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'payments' },
+      { event: '*', schema: 'public', table: 'payments', filter: `user_id=eq.${userId}` },
       async () => {
         await syncAll();
         onUpdate();

@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './dexie';
 import { getActiveCycle, closeActiveCycle } from './cycles';
 import { completeLoan, startNewCycle, updateLoanPrincipal, getLoanById } from './loans';
-import { pushPaymentToSupabase } from './sync';
+import { pushPaymentToSupabase, getCurrentUserId } from './sync';
 import { getCurrentDateISO } from '@/lib/utils/format';
 import type { Payment, CreatePaymentInput, PaymentType } from '@/types';
 
@@ -26,8 +26,10 @@ export async function createPayment(input: CreatePaymentInput): Promise<Payment>
   if (!activeCycle) throw new Error('No hay ciclo activo');
 
   // Crear el registro de pago
+  const userId = await getCurrentUserId();
   const payment: Payment = {
     id: uuidv4(),
+    user_id: userId,
     loan_id: input.loan_id,
     cycle_id: activeCycle.id,
     amount: input.amount,

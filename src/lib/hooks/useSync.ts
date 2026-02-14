@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { syncAll, subscribeToChanges } from '@/lib/db/sync';
 import { useOnlineStatus } from './useOnlineStatus';
+import { useAuth } from './useAuth';
 
 interface SyncState {
   isSyncing: boolean;
@@ -12,6 +13,7 @@ interface SyncState {
 
 export function useSync() {
   const isOnline = useOnlineStatus();
+  const { user } = useAuth();
   const [syncState, setSyncState] = useState<SyncState>({
     isSyncing: false,
     lastSync: null,
@@ -19,11 +21,13 @@ export function useSync() {
   });
 
   const sync = useCallback(async () => {
-    if (!isOnline) {
-      setSyncState((prev) => ({
-        ...prev,
-        error: 'Sin conexión a internet',
-      }));
+    if (!isOnline || !user) {
+      if (!isOnline) {
+        setSyncState((prev) => ({
+          ...prev,
+          error: 'Sin conexión a internet',
+        }));
+      }
       return;
     }
 
@@ -43,25 +47,25 @@ export function useSync() {
         error: 'Error al sincronizar',
       }));
     }
-  }, [isOnline]);
+  }, [isOnline, user]);
 
   // Sync inicial al montar
   useEffect(() => {
-    if (isOnline) {
+    if (isOnline && user) {
       sync();
     }
-  }, [isOnline, sync]);
+  }, [isOnline, user, sync]);
 
   // Suscribirse a cambios en tiempo real
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline || !user) return;
 
     const unsubscribe = subscribeToChanges(() => {
       setSyncState((prev) => ({ ...prev, lastSync: new Date() }));
-    });
+    }, user.id);
 
     return unsubscribe;
-  }, [isOnline]);
+  }, [isOnline, user]);
 
   return {
     ...syncState,

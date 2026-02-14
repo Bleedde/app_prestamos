@@ -11,10 +11,15 @@ class LoanDatabase extends Dexie {
     super('LoanDatabase');
 
     this.version(1).stores({
-      // Índices para búsquedas eficientes
       loans: 'id, client_name, status, current_cycle, cycle_start_date, created_at',
       cycles: 'id, loan_id, cycle_number, status, start_date',
       payments: 'id, loan_id, cycle_id, payment_type, payment_date',
+    });
+
+    this.version(2).stores({
+      loans: 'id, user_id, client_name, status, current_cycle, cycle_start_date, created_at',
+      cycles: 'id, user_id, loan_id, cycle_number, status, start_date',
+      payments: 'id, user_id, loan_id, cycle_id, payment_type, payment_date',
     });
   }
 }

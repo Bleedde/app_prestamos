@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Database, Trash2, Download, Info } from 'lucide-react';
+import { ArrowLeft, Database, Trash2, Download, Info, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -19,9 +19,23 @@ import {
 import { clearDatabase, getDatabaseStats } from '@/lib/db/dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db/dexie';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function SettingsPage() {
   const [clearing, setClearing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    setLoggingOut(true);
+    try {
+      await signOut();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   // Estadísticas de la base de datos
   const dbStats = useLiveQuery(async () => {
@@ -60,6 +74,31 @@ export default function SettingsPage() {
       </header>
 
       <div className="mx-auto max-w-lg px-4 py-6 space-y-6">
+        {/* Cuenta */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Cuenta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Email</span>
+              <span>{user?.email ?? '...'}</span>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleSignOut}
+              disabled={loggingOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {loggingOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Info de la app */}
         <Card>
           <CardHeader className="pb-2">
@@ -116,8 +155,9 @@ export default function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-2 text-sm text-muted-foreground">
-            <p>• Semanas 1-4 (días 1-28): <strong className="text-foreground">10%</strong> sobre el capital</p>
-            <p>• Día 29 en adelante: <strong className="text-foreground">15%</strong> sobre el capital</p>
+            <p>• Primeras 2 semanas: <strong className="text-foreground">10%</strong> sobre el capital</p>
+            <p>• Después de 2 semanas: <strong className="text-foreground">15%</strong> sobre el capital</p>
+            <p>• Vencimiento: el mismo día del mes siguiente</p>
             <p>• El interés siempre se calcula sobre el capital original</p>
             <p>• No hay interés compuesto</p>
           </CardContent>
