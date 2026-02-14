@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(xcopy:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout 15 npm run dev:*)",
+      "Bash(npm run dev:*)",
+      "Bash(code .)"
+    ]
+  }
+}
