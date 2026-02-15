@@ -9,13 +9,23 @@ import {
   CreditCard,
   History,
   Trash2,
-  Download,
+  Pencil,
   User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,12 +41,13 @@ import { PaymentForm } from '@/components/loans/PaymentForm';
 import { useLoan } from '@/lib/hooks/useLoans';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db/dexie';
-import { deleteLoan } from '@/lib/db/loans';
+import { deleteLoan, editLoanPrincipal } from '@/lib/db/loans';
 import {
   formatCOP,
   formatDate,
   formatDateShort,
   formatDaysUntilDue,
+  parseAmount,
 } from '@/lib/utils/format';
 import { formatInterestRate } from '@/lib/utils/interest';
 import type { Payment } from '@/types';
@@ -49,6 +60,10 @@ export default function LoanDetailPage() {
   const { loan, isLoading } = useLoan(loanId);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editPrincipalStr, setEditPrincipalStr] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Obtener historial de pagos
   const payments = useLiveQuery(async () => {
@@ -73,6 +88,33 @@ export default function LoanDetailPage() {
       console.error(err);
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleOpenEdit = () => {
+    if (loan) {
+      setEditPrincipalStr(String(loan.principal));
+      setEditError(null);
+      setEditOpen(true);
+    }
+  };
+
+  const handleEditPrincipal = async () => {
+    const newPrincipal = parseAmount(editPrincipalStr);
+    if (newPrincipal <= 0) {
+      setEditError('El monto debe ser mayor a 0');
+      return;
+    }
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      await editLoanPrincipal(loanId, newPrincipal);
+      setEditOpen(false);
+    } catch (err) {
+      setEditError('Error al actualizar el capital');
+      console.error(err);
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -199,10 +241,18 @@ export default function LoanDetailPage() {
             <p className="text-3xl font-bold text-primary">
               {formatCOP(loan.total_owed)}
             </p>
-            <div className="mt-2 flex gap-4 text-sm">
+            <div className="mt-2 flex gap-4 text-sm items-center">
               <span>
                 Capital: <strong>{formatCOP(loan.principal)}</strong>
               </span>
+              {loan.status === 'active' && (
+                <button
+                  onClick={handleOpenEdit}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
               <span>
                 Intereses ({formatInterestRate(loan.current_interest_rate)}):{' '}
                 <strong className="text-success">
@@ -324,6 +374,54 @@ export default function LoanDetailPage() {
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
       />
+
+      {/* Modal de editar capital */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar capital</DialogTitle>
+            <DialogDescription>
+              Cambia el monto del capital sin afectar fechas ni ciclos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="editPrincipal">Nuevo capital (COP)</Label>
+              <Input
+                id="editPrincipal"
+                type="text"
+                inputMode="numeric"
+                value={editPrincipalStr}
+                onChange={(e) => setEditPrincipalStr(e.target.value)}
+                placeholder="Ej: 200000"
+              />
+              {parseAmount(editPrincipalStr) > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {formatCOP(parseAmount(editPrincipalStr))}
+                </p>
+              )}
+            </div>
+            {editError && (
+              <p className="text-sm text-destructive">{editError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={editLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEditPrincipal}
+              disabled={editLoading || parseAmount(editPrincipalStr) <= 0}
+            >
+              {editLoading ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -168,6 +168,26 @@ export async function updateLoanPrincipal(
 }
 
 /**
+ * Edita el capital de un préstamo (sin afectar fechas ni ciclos)
+ */
+export async function editLoanPrincipal(
+  id: string,
+  newPrincipal: number
+): Promise<void> {
+  if (newPrincipal <= 0) {
+    throw new Error('El capital debe ser mayor a 0');
+  }
+
+  await db.loans.update(id, {
+    principal: newPrincipal,
+    updated_at: getCurrentDateISO(),
+  });
+
+  const loan = await db.loans.get(id);
+  if (loan) pushLoanToSupabase(loan);
+}
+
+/**
  * Actualiza la foto del cliente
  */
 export async function updateLoanPhoto(
