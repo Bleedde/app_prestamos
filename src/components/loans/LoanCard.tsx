@@ -72,7 +72,7 @@ export function LoanCard({ loan }: LoanCardProps) {
 
   return (
     <Link href={`/loans/${loan.id}`}>
-      <Card className="transition-all hover:bg-accent/50 active:scale-[0.98]">
+      <Card className="transition-all mt-5 hover:bg-accent/50 active:scale-[0.98]">
         <CardContent className="p-4">
           {/* Header: Avatar, nombre, badge */}
           <div className="mb-3 flex items-start justify-between">

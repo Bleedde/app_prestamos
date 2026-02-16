@@ -208,44 +208,47 @@ export async function syncAll(): Promise<{ success: boolean; message: string }> 
       pullPaymentsFromSupabase(),
     ]);
 
-    // Merge con local (Supabase tiene prioridad en caso de conflicto)
+    // Supabase es la fuente de verdad: reemplazar datos locales con remotos
+    const remoteLoanIds = new Set(remoteLoans.map((l) => l.id));
+    const remoteCycleIds = new Set(remoteCycles.map((c) => c.id));
+    const remotePaymentIds = new Set(remotePayments.map((p) => p.id));
+
     await db.transaction('rw', [db.loans, db.cycles, db.payments], async () => {
-      // Insertar/actualizar loans
+      // Eliminar registros locales que ya no existen en Supabase
+      const localLoans = await db.loans.toArray();
+      for (const loan of localLoans) {
+        if (!remoteLoanIds.has(loan.id)) {
+          await db.loans.delete(loan.id);
+        }
+      }
+
+      const localCycles = await db.cycles.toArray();
+      for (const cycle of localCycles) {
+        if (!remoteCycleIds.has(cycle.id)) {
+          await db.cycles.delete(cycle.id);
+        }
+      }
+
+      const localPayments = await db.payments.toArray();
+      for (const payment of localPayments) {
+        if (!remotePaymentIds.has(payment.id)) {
+          await db.payments.delete(payment.id);
+        }
+      }
+
+      // Insertar/actualizar con datos remotos
       for (const loan of remoteLoans) {
         await db.loans.put(loan);
       }
 
-      // Insertar/actualizar cycles
       for (const cycle of remoteCycles) {
         await db.cycles.put(cycle);
       }
 
-      // Insertar/actualizar payments
       for (const payment of remotePayments) {
         await db.payments.put(payment);
       }
     });
-
-    // Push de datos locales que no existan en remoto
-    const localLoans = await db.loans.toArray();
-    const remoteIds = new Set(remoteLoans.map((l) => l.id));
-
-    for (const loan of localLoans) {
-      if (!remoteIds.has(loan.id)) {
-        await pushLoanToSupabase(loan);
-
-        // También push cycles y payments de este loan
-        const cycles = await db.cycles.where('loan_id').equals(loan.id).toArray();
-        for (const cycle of cycles) {
-          await pushCycleToSupabase(cycle);
-        }
-
-        const payments = await db.payments.where('loan_id').equals(loan.id).toArray();
-        for (const payment of payments) {
-          await pushPaymentToSupabase(payment);
-        }
-      }
-    }
 
     return { success: true, message: 'Sincronización completada' };
   } catch (err) {
