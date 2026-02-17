@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './dexie';
 import { createCycle } from './cycles';
 import { pushLoanToSupabase, deleteLoanFromSupabase, getCurrentUserId } from './sync';
-import { enrichLoanWithCalculations } from '@/lib/utils/interest';
+import { enrichLoanWithCalculations, calculateDueDate } from '@/lib/utils/interest';
 import { getCurrentDateISO } from '@/lib/utils/format';
 import type { Loan, LoanWithCalculations, CreateLoanInput, LoanStatus } from '@/types';
 
@@ -118,10 +118,16 @@ export async function startNewCycle(loanId: string): Promise<void> {
   const now = getCurrentDateISO();
   const newCycleNumber = loan.current_cycle + 1;
 
+  // El nuevo ciclo inicia en la fecha de vencimiento del ciclo anterior,
+  // NO en la fecha actual del pago. Esto preserva el día original del préstamo.
+  // Ej: préstamo del 13 enero → ciclo 1: 13 ene-13 feb → ciclo 2: 13 feb-13 mar
+  const newCycleStartDate = calculateDueDate(loan.cycle_start_date);
+  const newCycleStartISO = newCycleStartDate.split('T')[0] + 'T00:00:00.000Z';
+
   // Actualizar préstamo con nuevo ciclo
   await db.loans.update(loanId, {
     current_cycle: newCycleNumber,
-    cycle_start_date: now,
+    cycle_start_date: newCycleStartISO,
     updated_at: now,
   });
 
@@ -129,7 +135,7 @@ export async function startNewCycle(loanId: string): Promise<void> {
   await createCycle({
     loan_id: loanId,
     cycle_number: newCycleNumber,
-    start_date: now,
+    start_date: newCycleStartISO,
   });
 
   // Sync con Supabase
