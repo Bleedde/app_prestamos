@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 /**
@@ -21,13 +21,22 @@ export function formatCOP(amount: number, showDecimals = false): string {
 }
 
 /**
+ * Parsea una fecha como medianoche LOCAL (evita desfases por zona horaria)
+ */
+function parseLocalDate(dateString: string): Date {
+  const dateStr = dateString.split('T')[0];
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Formatea una fecha en formato legible en español
  * Ejemplo: "2025-02-13" -> "13 de febrero, 2025"
  * @param dateString Fecha en formato ISO
  * @returns String formateado
  */
 export function formatDate(dateString: string): string {
-  const date = parseISO(dateString);
+  const date = parseLocalDate(dateString);
   return format(date, "d 'de' MMMM, yyyy", { locale: es });
 }
 
@@ -38,7 +47,7 @@ export function formatDate(dateString: string): string {
  * @returns String formateado corto
  */
 export function formatDateShort(dateString: string): string {
-  const date = parseISO(dateString);
+  const date = parseLocalDate(dateString);
   return format(date, 'd MMM', { locale: es });
 }
 
@@ -49,7 +58,7 @@ export function formatDateShort(dateString: string): string {
  * @returns String formateado
  */
 export function formatDateCompact(dateString: string): string {
-  const date = parseISO(dateString);
+  const date = parseLocalDate(dateString);
   return format(date, 'dd/MM', { locale: es });
 }
 
@@ -60,7 +69,7 @@ export function formatDateCompact(dateString: string): string {
  * @returns String formateado con hora
  */
 export function formatDateTime(dateString: string): string {
-  const date = parseISO(dateString);
+  const date = parseLocalDate(dateString);
   return format(date, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es });
 }
 

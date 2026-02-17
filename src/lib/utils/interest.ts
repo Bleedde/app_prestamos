@@ -1,4 +1,4 @@
-import { differenceInDays, addMonths, parseISO } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import type { Loan, LoanWithCalculations } from '@/types';
 
 /**
@@ -11,6 +11,16 @@ import type { Loan, LoanWithCalculations } from '@/types';
  * El interés siempre se calcula sobre el capital original,
  * nunca sobre intereses acumulados (no hay interés compuesto).
  */
+
+/**
+ * Parsea una fecha como medianoche LOCAL (evita desfases por zona horaria)
+ * Acepta "2026-01-13", "2026-01-13T05:00:00.000Z", etc.
+ */
+function parseLocalDate(dateString: string): Date {
+  const dateStr = dateString.split('T')[0]; // extraer solo YYYY-MM-DD
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day); // medianoche LOCAL
+}
 
 const RATE_NORMAL = 0.10; // 10% primeras 2 semanas
 const RATE_OVERDUE = 0.15; // 15% después de 2 semanas
@@ -30,7 +40,7 @@ export function getInterestRate(days: number): number {
  * Calcula los días transcurridos desde una fecha
  */
 export function getDaysElapsed(startDate: string, currentDate?: Date): number {
-  const start = parseISO(startDate);
+  const start = parseLocalDate(startDate);
   const now = currentDate || new Date();
   const days = differenceInDays(now, start);
   return Math.max(0, days);
@@ -54,11 +64,24 @@ export function calculateTotalOwed(principal: number, days: number): number {
 /**
  * Calcula la fecha de vencimiento (mismo día del mes siguiente)
  * Ej: 14 enero -> 14 febrero, 31 enero -> 28 febrero
+ * Usa aritmética pura de strings para evitar problemas de zona horaria
  */
 export function calculateDueDate(cycleStartDate: string): string {
-  const start = parseISO(cycleStartDate);
-  const dueDate = addMonths(start, 1);
-  return dueDate.toISOString();
+  const dateStr = cycleStartDate.split('T')[0]; // "2026-01-13"
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  let newMonth = month + 1;
+  let newYear = year;
+  if (newMonth > 12) {
+    newMonth = 1;
+    newYear++;
+  }
+
+  // Manejar meses con menos días (ej: 31 ene -> 28 feb)
+  const daysInNewMonth = new Date(newYear, newMonth, 0).getDate();
+  const newDay = Math.min(day, daysInNewMonth);
+
+  return `${newYear}-${String(newMonth).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`;
 }
 
 /**
@@ -66,7 +89,7 @@ export function calculateDueDate(cycleStartDate: string): string {
  */
 export function getDaysUntilDue(cycleStartDate: string, currentDate?: Date): number {
   const now = currentDate || new Date();
-  const dueDate = parseISO(calculateDueDate(cycleStartDate));
+  const dueDate = parseLocalDate(calculateDueDate(cycleStartDate));
   return differenceInDays(dueDate, now);
 }
 

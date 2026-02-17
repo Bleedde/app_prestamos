@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './dexie';
-import { getActiveCycle, closeActiveCycle } from './cycles';
-import { completeLoan, startNewCycle, updateLoanPrincipal, getLoanById } from './loans';
-import { pushPaymentToSupabase, getCurrentUserId } from './sync';
+import { getActiveCycle } from './cycles';
+import { getLoanById } from './loans';
+import { pushPaymentToSupabase, pushLoanToSupabase, pushCycleToSupabase, getCurrentUserId } from './sync';
 import { getCurrentDateISO } from '@/lib/utils/format';
+import { calculateDueDate } from '@/lib/utils/interest';
 import type { Payment, CreatePaymentInput, PaymentType } from '@/types';
 
 /**
@@ -25,7 +26,7 @@ export async function createPayment(input: CreatePaymentInput): Promise<Payment>
   const activeCycle = await getActiveCycle(input.loan_id);
   if (!activeCycle) throw new Error('No hay ciclo activo');
 
-  // Crear el registro de pago
+  // Preparar datos ANTES de la transacción (evitar async no-Dexie dentro)
   const userId = await getCurrentUserId();
   const payment: Payment = {
     id: uuidv4(),
@@ -40,35 +41,88 @@ export async function createPayment(input: CreatePaymentInput): Promise<Payment>
     created_at: now,
   };
 
-  // Ejecutar dentro de una transacción para mantener consistencia
+  // Pre-calcular datos para nuevo ciclo si es interest_only
+  let newCycleId: string | undefined;
+  let newCycleStartISO: string | undefined;
+  let newCycleNumber: number | undefined;
+  if (input.payment_type === 'interest_only') {
+    newCycleNumber = loan.current_cycle + 1;
+    const newCycleStartDate = calculateDueDate(loan.cycle_start_date);
+    newCycleStartISO = newCycleStartDate.split('T')[0];
+    newCycleId = uuidv4();
+  }
+
+  // Ejecutar SOLO operaciones Dexie dentro de la transacción
   await db.transaction('rw', [db.payments, db.loans, db.cycles], async () => {
     // Guardar el pago
     await db.payments.add(payment);
 
-    // Ejecutar lógica según tipo de pago
     switch (input.payment_type) {
       case 'complete':
-        // Cerrar ciclo y completar préstamo
-        await closeActiveCycle(input.loan_id);
-        await completeLoan(input.loan_id);
+        // Cerrar ciclo activo
+        await db.cycles.update(activeCycle.id, {
+          status: 'completed',
+          end_date: now,
+        });
+        // Completar préstamo
+        await db.loans.update(input.loan_id, {
+          status: 'completed',
+          updated_at: now,
+        });
         break;
 
       case 'interest_only':
-        // Cerrar ciclo actual e iniciar nuevo
-        await closeActiveCycle(input.loan_id);
-        await startNewCycle(input.loan_id);
+        // Cerrar ciclo activo
+        await db.cycles.update(activeCycle.id, {
+          status: 'completed',
+          end_date: now,
+        });
+        // Crear nuevo ciclo
+        await db.cycles.add({
+          id: newCycleId!,
+          user_id: userId,
+          loan_id: input.loan_id,
+          cycle_number: newCycleNumber!,
+          start_date: newCycleStartISO!,
+          end_date: undefined,
+          status: 'active',
+          created_at: now,
+        });
+        // Actualizar préstamo con nuevo ciclo
+        await db.loans.update(input.loan_id, {
+          current_cycle: newCycleNumber!,
+          cycle_start_date: newCycleStartISO!,
+          updated_at: now,
+        });
         break;
 
       case 'partial':
-        // Reducir el capital
         const newPrincipal = loan.principal - input.amount;
-        await updateLoanPrincipal(input.loan_id, newPrincipal);
+        if (newPrincipal <= 0) {
+          await db.loans.update(input.loan_id, {
+            status: 'completed',
+            updated_at: now,
+          });
+        } else {
+          await db.loans.update(input.loan_id, {
+            principal: newPrincipal,
+            updated_at: now,
+          });
+        }
         break;
     }
   });
 
-  // Sync con Supabase
+  // Sync con Supabase DESPUÉS de la transacción
   pushPaymentToSupabase(payment);
+  const updatedLoan = await db.loans.get(input.loan_id);
+  if (updatedLoan) pushLoanToSupabase(updatedLoan);
+  const closedCycle = await db.cycles.get(activeCycle.id);
+  if (closedCycle) pushCycleToSupabase(closedCycle);
+  if (newCycleId) {
+    const newCycle = await db.cycles.get(newCycleId);
+    if (newCycle) pushCycleToSupabase(newCycle);
+  }
 
   return payment;
 }
