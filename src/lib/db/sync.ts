@@ -201,6 +201,8 @@ export async function pullPaymentsFromSupabase(): Promise<Payment[]> {
 
 export async function syncAll(): Promise<{ success: boolean; message: string }> {
   try {
+    const userId = await getCurrentUserId();
+
     // Pull de Supabase
     const [remoteLoans, remoteCycles, remotePayments] = await Promise.all([
       pullLoansFromSupabase(),
@@ -212,11 +214,11 @@ export async function syncAll(): Promise<{ success: boolean; message: string }> 
     const remoteCycleIds = new Set(remoteCycles.map((c) => c.id));
     const remotePaymentIds = new Set(remotePayments.map((p) => p.id));
 
-    // Leer datos locales para encontrar registros no sincronizados
+    // Leer datos locales del usuario actual para encontrar registros no sincronizados
     const [localLoans, localCycles, localPayments] = await Promise.all([
-      db.loans.toArray(),
-      db.cycles.toArray(),
-      db.payments.toArray(),
+      db.loans.where('user_id').equals(userId).toArray(),
+      db.cycles.where('user_id').equals(userId).toArray(),
+      db.payments.where('user_id').equals(userId).toArray(),
     ]);
 
     // Push registros locales que no existen en Supabase

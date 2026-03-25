@@ -21,6 +21,12 @@ class LoanDatabase extends Dexie {
       cycles: 'id, user_id, loan_id, cycle_number, status, start_date',
       payments: 'id, user_id, loan_id, cycle_id, payment_type, payment_date',
     });
+
+    this.version(3).stores({
+      loans: 'id, user_id, client_name, status, current_cycle, cycle_start_date, created_at, [user_id+status]',
+      cycles: 'id, user_id, loan_id, cycle_number, status, start_date',
+      payments: 'id, user_id, loan_id, cycle_id, payment_type, payment_date',
+    });
   }
 }
 
