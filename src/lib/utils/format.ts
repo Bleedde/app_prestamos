@@ -82,13 +82,12 @@ export function getCurrentDateISO(): string {
 }
 
 /**
- * Obtiene solo la fecha (sin hora) en formato ISO
- * @returns Fecha ISO string (medianoche UTC)
+ * Obtiene la fecha LOCAL actual en formato YYYY-MM-DD
+ * Usar para cycle_start_date y campos de fecha que se parsean con parseLocalDate
  */
-export function getTodayISO(): string {
+export function getTodayLocalISO(): string {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today.toISOString();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 /**

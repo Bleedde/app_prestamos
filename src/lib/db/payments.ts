@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './dexie';
-import { getActiveCycle } from './cycles';
+import { getActiveCycle, createCycle } from './cycles';
 import { getLoanById } from './loans';
 import { pushPaymentToSupabase, pushLoanToSupabase, pushCycleToSupabase, getCurrentUserId } from './sync';
 import { getCurrentDateISO } from '@/lib/utils/format';
@@ -23,8 +23,17 @@ export async function createPayment(input: CreatePaymentInput): Promise<Payment>
   if (!loan) throw new Error('Préstamo no encontrado');
   if (loan.status !== 'active') throw new Error('El préstamo no está activo');
 
-  const activeCycle = await getActiveCycle(input.loan_id);
-  if (!activeCycle) throw new Error('No hay ciclo activo');
+  let activeCycle = await getActiveCycle(input.loan_id);
+
+  // Recuperación defensiva: si no hay ciclo activo pero el préstamo está activo,
+  // recrear el ciclo desde los datos del préstamo (pudo perderse durante sync)
+  if (!activeCycle) {
+    activeCycle = await createCycle({
+      loan_id: input.loan_id,
+      cycle_number: loan.current_cycle,
+      start_date: loan.cycle_start_date,
+    });
+  }
 
   // Preparar datos ANTES de la transacción (evitar async no-Dexie dentro)
   const userId = await getCurrentUserId();

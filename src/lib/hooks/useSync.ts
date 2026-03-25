@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { syncAll, subscribeToChanges } from '@/lib/db/sync';
 import { useOnlineStatus } from './useOnlineStatus';
 import { useAuth } from './useAuth';
@@ -19,6 +19,7 @@ export function useSync() {
     lastSync: null,
     error: null,
   });
+  const hasSyncedRef = useRef(false);
 
   const sync = useCallback(async () => {
     if (!isOnline || !user) {
@@ -40,7 +41,7 @@ export function useSync() {
         lastSync: new Date(),
         error: result.success ? null : result.message,
       });
-    } catch (err) {
+    } catch {
       setSyncState((prev) => ({
         ...prev,
         isSyncing: false,
@@ -49,12 +50,27 @@ export function useSync() {
     }
   }, [isOnline, user]);
 
-  // Sync inicial al montar
+  // Sync inicial al montar (solo una vez cuando hay conexión y usuario)
   useEffect(() => {
-    if (isOnline && user) {
-      sync();
+    if (isOnline && user && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      syncAll()
+        .then((result) => {
+          setSyncState({
+            isSyncing: false,
+            lastSync: new Date(),
+            error: result.success ? null : result.message,
+          });
+        })
+        .catch(() => {
+          setSyncState((prev) => ({
+            ...prev,
+            isSyncing: false,
+            error: 'Error al sincronizar',
+          }));
+        });
     }
-  }, [isOnline, user, sync]);
+  }, [isOnline, user]);
 
   // Suscribirse a cambios en tiempo real
   useEffect(() => {

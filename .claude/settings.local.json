@@ -10,7 +10,10 @@
       "Bash(timeout 15 npm run dev:*)",
       "Bash(npm run dev:*)",
       "Bash(code .)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx next build:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

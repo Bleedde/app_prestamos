@@ -208,37 +208,50 @@ export async function syncAll(): Promise<{ success: boolean; message: string }> 
       pullPaymentsFromSupabase(),
     ]);
 
-    // Supabase es la fuente de verdad: reemplazar datos locales con remotos
     const remoteLoanIds = new Set(remoteLoans.map((l) => l.id));
     const remoteCycleIds = new Set(remoteCycles.map((c) => c.id));
     const remotePaymentIds = new Set(remotePayments.map((p) => p.id));
 
+    // Leer datos locales para encontrar registros no sincronizados
+    const [localLoans, localCycles, localPayments] = await Promise.all([
+      db.loans.toArray(),
+      db.cycles.toArray(),
+      db.payments.toArray(),
+    ]);
+
+    // Push registros locales que no existen en Supabase
+    // (pueden ser registros recién creados cuyo push aún no llegó)
+    // Orden: loans → cycles → payments (respetar FK constraints)
+    const localOnlyLoans = localLoans.filter((l) => !remoteLoanIds.has(l.id));
+    const localOnlyCycles = localCycles.filter((c) => !remoteCycleIds.has(c.id));
+    const localOnlyPayments = localPayments.filter((p) => !remotePaymentIds.has(p.id));
+
+    for (const loan of localOnlyLoans) {
+      await pushLoanToSupabase(loan);
+    }
+    for (const cycle of localOnlyCycles) {
+      await pushCycleToSupabase(cycle);
+    }
+    for (const payment of localOnlyPayments) {
+      await pushPaymentToSupabase(payment);
+    }
+
+    // Push loans modificados localmente que son más recientes que la versión remota
+    const remoteLoanMap = new Map(remoteLoans.map((l) => [l.id, l]));
+    for (const localLoan of localLoans) {
+      const remoteLoan = remoteLoanMap.get(localLoan.id);
+      if (remoteLoan && localLoan.updated_at > remoteLoan.updated_at) {
+        await pushLoanToSupabase(localLoan);
+      }
+    }
+
+    // Insertar/actualizar con datos remotos (solo si no hay versión local más reciente)
     await db.transaction('rw', [db.loans, db.cycles, db.payments], async () => {
-      // Eliminar registros locales que ya no existen en Supabase
-      const localLoans = await db.loans.toArray();
-      for (const loan of localLoans) {
-        if (!remoteLoanIds.has(loan.id)) {
-          await db.loans.delete(loan.id);
-        }
-      }
-
-      const localCycles = await db.cycles.toArray();
-      for (const cycle of localCycles) {
-        if (!remoteCycleIds.has(cycle.id)) {
-          await db.cycles.delete(cycle.id);
-        }
-      }
-
-      const localPayments = await db.payments.toArray();
-      for (const payment of localPayments) {
-        if (!remotePaymentIds.has(payment.id)) {
-          await db.payments.delete(payment.id);
-        }
-      }
-
-      // Insertar/actualizar con datos remotos
       for (const loan of remoteLoans) {
-        await db.loans.put(loan);
+        const localLoan = localLoans.find((l) => l.id === loan.id);
+        if (!localLoan || loan.updated_at >= localLoan.updated_at) {
+          await db.loans.put(loan);
+        }
       }
 
       for (const cycle of remoteCycles) {

@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { createLoan } from '@/lib/db/loans';
 import { formatCOP, parseAmount } from '@/lib/utils/format';
+import { RATE_NORMAL, RATE_OVERDUE, DAYS_RATE_THRESHOLD } from '@/lib/constants';
 
 export function LoanForm() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export function LoanForm() {
   const principal = parseAmount(principalStr);
 
   // Preview del préstamo
-  const previewInterest = principal * 0.1; // 10% inicial
+  const previewInterest = principal * RATE_NORMAL;
   const previewTotal = principal + previewInterest;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +55,7 @@ export function LoanForm() {
       const loan = await createLoan({
         client_name: clientName.trim(),
         principal,
-        start_date: startDate.toISOString(),
+        start_date: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`,
       });
 
       // Redirigir al detalle del préstamo
@@ -152,7 +153,7 @@ export function LoanForm() {
               <span>{formatCOP(principal)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Interés (10%):</span>
+              <span className="text-muted-foreground">Interés ({Math.round(RATE_NORMAL * 100)}%):</span>
               <span className="text-success">{formatCOP(previewInterest)}</span>
             </div>
             <div className="flex justify-between border-t border-border pt-2 font-medium">
@@ -160,7 +161,7 @@ export function LoanForm() {
               <span>{formatCOP(previewTotal)}</span>
             </div>
             <p className="text-xs text-muted-foreground pt-2">
-              * Si el préstamo supera los 28 días, el interés sube a 15%
+              * Si el préstamo supera los {DAYS_RATE_THRESHOLD} días, el interés sube a {Math.round(RATE_OVERDUE * 100)}%
             </p>
           </CardContent>
         </Card>

@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { User, Calendar, TrendingUp } from 'lucide-react';
+import { Calendar, TrendingUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   formatCOP,
@@ -14,14 +13,14 @@ import {
 import { formatInterestRate } from '@/lib/utils/interest';
 import type { LoanWithCalculations } from '@/types';
 import { cn } from '@/lib/utils';
+import { CYCLE_DAYS, DAYS_DUE_WARNING_THRESHOLD } from '@/lib/constants';
 
 interface LoanCardProps {
   loan: LoanWithCalculations;
 }
 
 export function LoanCard({ loan }: LoanCardProps) {
-  // Calcular progreso (días / 30)
-  const progress = Math.min((loan.days_elapsed / 30) * 100, 100);
+  const progress = Math.min((loan.days_elapsed / CYCLE_DAYS) * 100, 100);
 
   // Determinar estado visual
   const getStatusBadge = () => {
@@ -39,7 +38,7 @@ export function LoanCard({ loan }: LoanCardProps) {
         </Badge>
       );
     }
-    if (loan.days_until_due <= 3) {
+    if (loan.days_until_due <= DAYS_DUE_WARNING_THRESHOLD) {
       return (
         <Badge className="bg-warning text-warning-foreground">
           Por vencer
@@ -56,7 +55,7 @@ export function LoanCard({ loan }: LoanCardProps) {
   // Color del progress bar según estado
   const getProgressColor = () => {
     if (loan.is_overdue) return 'bg-destructive';
-    if (loan.days_until_due <= 3) return 'bg-warning';
+    if (loan.days_until_due <= DAYS_DUE_WARNING_THRESHOLD) return 'bg-warning';
     return 'bg-primary';
   };
 
@@ -96,7 +95,7 @@ export function LoanCard({ loan }: LoanCardProps) {
           {/* Progress bar */}
           <div className="mb-3">
             <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-              <span>Día {loan.days_elapsed} de 30</span>
+              <span>Día {loan.days_elapsed} de {CYCLE_DAYS}</span>
               <span>{formatDaysUntilDue(loan.days_until_due)}</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">

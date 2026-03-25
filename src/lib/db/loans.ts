@@ -3,7 +3,8 @@ import { db } from './dexie';
 import { createCycle } from './cycles';
 import { pushLoanToSupabase, deleteLoanFromSupabase, getCurrentUserId } from './sync';
 import { enrichLoanWithCalculations, calculateDueDate } from '@/lib/utils/interest';
-import { getCurrentDateISO } from '@/lib/utils/format';
+import { getCurrentDateISO, getTodayLocalISO } from '@/lib/utils/format';
+import { DAYS_DUE_SOON_THRESHOLD } from '@/lib/constants';
 import type { Loan, LoanWithCalculations, CreateLoanInput, LoanStatus } from '@/types';
 
 /**
@@ -11,7 +12,7 @@ import type { Loan, LoanWithCalculations, CreateLoanInput, LoanStatus } from '@/
  */
 export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   const now = getCurrentDateISO();
-  const startDate = input.start_date || now;
+  const startDate = input.start_date || getTodayLocalISO();
   const userId = await getCurrentUserId();
 
   const loan: Loan = {
@@ -229,7 +230,7 @@ export async function deleteLoan(id: string): Promise<void> {
 export async function getUpcomingDueLoans(): Promise<LoanWithCalculations[]> {
   const activeLoans = await getActiveLoans();
   return activeLoans.filter(
-    (loan) => loan.days_until_due > 0 && loan.days_until_due <= 7
+    (loan) => loan.days_until_due > 0 && loan.days_until_due <= DAYS_DUE_SOON_THRESHOLD
   );
 }
 

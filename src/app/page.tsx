@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Plus, Search, Filter } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSearchLoans } from '@/lib/hooks/useLoans';
+import { LOANS_PAGE_SIZE } from '@/lib/constants';
 import type { LoanStatus } from '@/types';
 
 type FilterStatus = 'all' | LoanStatus;
@@ -16,27 +17,34 @@ type FilterStatus = 'all' | LoanStatus;
 export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [visibleCount, setVisibleCount] = useState(LOANS_PAGE_SIZE);
   const { loans, isLoading } = useSearchLoans(searchTerm);
 
-  // Filtrar por estado
-  const filteredLoans = loans.filter((loan) => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'active') return loan.status === 'active';
-    if (filterStatus === 'completed') return loan.status === 'completed';
-    return true;
-  });
+  // Filtrar y ordenar (memoizado para no recalcular en cada render)
+  const sortedLoans = useMemo(() => {
+    const filtered = loans.filter((loan) => {
+      if (filterStatus === 'all') return true;
+      if (filterStatus === 'active') return loan.status === 'active';
+      if (filterStatus === 'completed') return loan.status === 'completed';
+      return true;
+    });
 
-  // Ordenar: vencidos primero, luego por días hasta vencimiento
-  const sortedLoans = [...filteredLoans].sort((a, b) => {
-    // Completados al final
-    if (a.status === 'completed' && b.status !== 'completed') return 1;
-    if (a.status !== 'completed' && b.status === 'completed') return -1;
-    // Vencidos primero
-    if (a.is_overdue && !b.is_overdue) return -1;
-    if (!a.is_overdue && b.is_overdue) return 1;
-    // Luego por días hasta vencimiento (menores primero)
-    return a.days_until_due - b.days_until_due;
-  });
+    return [...filtered].sort((a, b) => {
+      if (a.status === 'completed' && b.status !== 'completed') return 1;
+      if (a.status !== 'completed' && b.status === 'completed') return -1;
+      if (a.is_overdue && !b.is_overdue) return -1;
+      if (!a.is_overdue && b.is_overdue) return 1;
+      return a.days_until_due - b.days_until_due;
+    });
+  }, [loans, filterStatus]);
+
+  const visibleLoans = sortedLoans.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedLoans.length;
+
+  const handleFilterChange = (v: string) => {
+    setFilterStatus(v as FilterStatus);
+    setVisibleCount(LOANS_PAGE_SIZE);
+  };
 
   return (
     <div className="min-h-screen">
@@ -50,7 +58,10 @@ export default function DashboardPage() {
             type="text"
             placeholder="Buscar por nombre..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setVisibleCount(LOANS_PAGE_SIZE);
+            }}
             className="pl-9"
           />
         </div>
@@ -58,7 +69,7 @@ export default function DashboardPage() {
         {/* Filtros */}
         <Tabs
           value={filterStatus}
-          onValueChange={(v) => setFilterStatus(v as FilterStatus)}
+          onValueChange={handleFilterChange}
           className="mb-4"
         >
           <TabsList className="grid w-full grid-cols-3">
@@ -71,7 +82,6 @@ export default function DashboardPage() {
         {/* Lista de préstamos */}
         <div className="space-y-3">
           {isLoading ? (
-            // Skeleton loading
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div
@@ -81,7 +91,6 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : sortedLoans.length === 0 ? (
-            // Estado vacío
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                 <Filter className="h-8 w-8 text-muted-foreground" />
@@ -102,8 +111,20 @@ export default function DashboardPage() {
               )}
             </div>
           ) : (
-            // Lista de tarjetas
-            sortedLoans.map((loan) => <LoanCard key={loan.id} loan={loan} />)
+            <>
+              {visibleLoans.map((loan) => (
+                <LoanCard key={loan.id} loan={loan} />
+              ))}
+              {hasMore && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setVisibleCount((prev) => prev + LOANS_PAGE_SIZE)}
+                >
+                  Ver más ({sortedLoans.length - visibleCount} restantes)
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>

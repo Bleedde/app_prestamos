@@ -10,7 +10,6 @@ import {
   History,
   Trash2,
   Pencil,
-  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +49,7 @@ import {
   parseAmount,
 } from '@/lib/utils/format';
 import { formatInterestRate } from '@/lib/utils/interest';
-import type { Payment } from '@/types';
+import { CYCLE_DAYS } from '@/lib/constants';
 
 export default function LoanDetailPage() {
   const params = useParams();
@@ -227,7 +226,7 @@ export default function LoanDetailPage() {
               {getStatusBadge()}
             </div>
             <p className="text-sm text-muted-foreground">
-              Ciclo {loan.current_cycle} • Día {loan.days_elapsed} de 30
+              Ciclo {loan.current_cycle} • Día {loan.days_elapsed} de {CYCLE_DAYS}
             </p>
           </div>
         </div>

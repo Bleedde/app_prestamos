@@ -3,7 +3,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db/dexie';
 import { enrichLoanWithCalculations } from '@/lib/utils/interest';
-import type { LoanWithCalculations, LoanStatus } from '@/types';
+import type { LoanStatus } from '@/types';
+import { DAYS_DUE_SOON_THRESHOLD } from '@/lib/constants';
 
 /**
  * Hook para obtener todos los préstamos con cálculos en tiempo real
@@ -127,7 +128,7 @@ export function useLoanStats() {
 /**
  * Hook para obtener préstamos próximos a vencer
  */
-export function useUpcomingDueLoans(daysThreshold = 7) {
+export function useUpcomingDueLoans(daysThreshold = DAYS_DUE_SOON_THRESHOLD) {
   const loans = useLiveQuery(async () => {
     const activeLoans = await db.loans
       .where('status')

@@ -1,5 +1,10 @@
 import { differenceInDays } from 'date-fns';
 import type { Loan, LoanWithCalculations } from '@/types';
+import {
+  RATE_NORMAL,
+  RATE_OVERDUE,
+  DAYS_RATE_THRESHOLD,
+} from '@/lib/constants';
 
 /**
  * LÓGICA DE INTERESES
@@ -22,15 +27,11 @@ function parseLocalDate(dateString: string): Date {
   return new Date(year, month - 1, day); // medianoche LOCAL
 }
 
-const RATE_NORMAL = 0.10; // 10% primeras 2 semanas
-const RATE_OVERDUE = 0.15; // 15% después de 2 semanas
-const DAYS_THRESHOLD = 14; // 2 semanas
-
 /**
  * Obtiene la tasa de interés basada en los días transcurridos
  */
 export function getInterestRate(days: number): number {
-  if (days <= DAYS_THRESHOLD) {
+  if (days <= DAYS_RATE_THRESHOLD) {
     return RATE_NORMAL;
   }
   return RATE_OVERDUE;

@@ -131,7 +131,7 @@ export function PaymentForm({
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      setError(err + 'Error al registrar el pago. Intenta de nuevo.');
+      setError(err instanceof Error ? err.message : 'Error al registrar el pago. Intenta de nuevo.');
       console.error(err);
     } finally {
       setIsLoading(false);

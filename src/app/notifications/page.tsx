@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOverdueLoans, useUpcomingDueLoans } from '@/lib/hooks/useLoans';
 import { formatCOP, formatDaysUntilDue } from '@/lib/utils/format';
+import { formatInterestRate } from '@/lib/utils/interest';
 
 export default function NotificationsPage() {
   const { loans: overdueLoans, isLoading: loadingOverdue } = useOverdueLoans();
   const { loans: upcomingLoans, isLoading: loadingUpcoming } =
-    useUpcomingDueLoans(7);
+    useUpcomingDueLoans();
 
   const isLoading = loadingOverdue || loadingUpcoming;
   const hasNotifications = overdueLoans.length > 0 || upcomingLoans.length > 0;
@@ -83,7 +84,7 @@ export default function NotificationsPage() {
                             {formatCOP(loan.total_owed)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            15% interés
+                            {formatInterestRate(loan.current_interest_rate)} interés
                           </p>
                         </div>
                       </Link>
@@ -121,7 +122,7 @@ export default function NotificationsPage() {
                             {formatCOP(loan.total_owed)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            10% interés
+                            {formatInterestRate(loan.current_interest_rate)} interés
                           </p>
                         </div>
                       </Link>
