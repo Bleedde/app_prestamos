@@ -103,9 +103,9 @@ export async function deleteLoanFromSupabase(loanId: string): Promise<void> {
 
 // ============== PULL: Supabase -> Local ==============
 
-export async function pullLoansFromSupabase(): Promise<Loan[]> {
+export async function pullLoansFromSupabase(userId?: string): Promise<Loan[]> {
   try {
-    const userId = await getCurrentUserId();
+    if (!userId) userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from('loans')
       .select('*')
@@ -135,9 +135,9 @@ export async function pullLoansFromSupabase(): Promise<Loan[]> {
   }
 }
 
-export async function pullCyclesFromSupabase(): Promise<Cycle[]> {
+export async function pullCyclesFromSupabase(userId?: string): Promise<Cycle[]> {
   try {
-    const userId = await getCurrentUserId();
+    if (!userId) userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from('cycles')
       .select('*')
@@ -165,9 +165,9 @@ export async function pullCyclesFromSupabase(): Promise<Cycle[]> {
   }
 }
 
-export async function pullPaymentsFromSupabase(): Promise<Payment[]> {
+export async function pullPaymentsFromSupabase(userId?: string): Promise<Payment[]> {
   try {
-    const userId = await getCurrentUserId();
+    if (!userId) userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from('payments')
       .select('*')
@@ -203,11 +203,11 @@ export async function syncAll(): Promise<{ success: boolean; message: string }> 
   try {
     const userId = await getCurrentUserId();
 
-    // Pull de Supabase
+    // Pull de Supabase (reutilizando el userId ya obtenido)
     const [remoteLoans, remoteCycles, remotePayments] = await Promise.all([
-      pullLoansFromSupabase(),
-      pullCyclesFromSupabase(),
-      pullPaymentsFromSupabase(),
+      pullLoansFromSupabase(userId),
+      pullCyclesFromSupabase(userId),
+      pullPaymentsFromSupabase(userId),
     ]);
 
     const remoteLoanIds = new Set(remoteLoans.map((l) => l.id));
